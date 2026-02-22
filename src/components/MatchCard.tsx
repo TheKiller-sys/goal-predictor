@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { Zap, Clock } from "lucide-react";
+import { Zap, Clock, ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
 import type { Match } from "@/lib/mockData";
 
 interface MatchCardProps {
@@ -84,8 +85,14 @@ const MatchCard = ({ match, onSelect, isSelected }: MatchCardProps) => {
           <span className="font-mono text-[10px] text-foreground">{match.homeXg} - {match.awayXg}</span>
         </div>
         <div className="flex items-center gap-1.5 justify-end">
-          <span className="text-[10px] text-muted-foreground">PPDA</span>
-          <span className="font-mono text-[10px] text-foreground">{match.homePpda} - {match.awayPpda}</span>
+          <Link
+            to={`/match/${match.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 transition-colors"
+          >
+            <ExternalLink className="h-3 w-3" />
+            Detalle
+          </Link>
         </div>
       </div>
     </motion.div>
