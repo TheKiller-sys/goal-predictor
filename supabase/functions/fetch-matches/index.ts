@@ -94,33 +94,47 @@ Deno.serve(async (req) => {
 
     for (const league of leaguesToFetch) {
       try {
-        // Fetch fixtures - "next" doesn't work with "season" param
-        let params: Record<string, string>;
+        let fixtures: any[] = [];
+        
         if (action === "live") {
-          params = { live: "all" };
-        } else if (action === "upcoming") {
-          // Get next 10 from this league
-          const today = new Date().toISOString().split("T")[0];
-          const future = new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0];
-          params = {
-            league: league.id.toString(),
-            season: CURRENT_SEASON.toString(),
-            from: today,
-            to: future,
-          };
+          fixtures = await fetchFromAPIFootball("fixtures", { live: "all" }) || [];
         } else {
-          params = {
-            league: league.id.toString(),
-            season: CURRENT_SEASON.toString(),
-            last: "10",
-          };
+          // Try current season first, then previous
+          for (const season of [CURRENT_SEASON, CURRENT_SEASON - 1]) {
+            const params: Record<string, string> = {
+              league: league.id.toString(),
+              season: season.toString(),
+            };
+            if (action === "upcoming") {
+              const today = new Date().toISOString().split("T")[0];
+              const future = new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
+              params.from = today;
+              params.to = future;
+            } else {
+              params.last = "10";
+            }
+            
+            console.log(`Fetching ${league.name} season ${season}:`, JSON.stringify(params));
+            const result = await fetchFromAPIFootball("fixtures", params);
+            if (result && result.length > 0) {
+              fixtures = result;
+              break;
+            }
+          }
+          
+          // Fallback: try without season using next
+          if (fixtures.length === 0) {
+            console.log(`Fallback: ${league.name} using next param`);
+            const result = await fetchFromAPIFootball("fixtures", {
+              league: league.id.toString(),
+              next: "5",
+            });
+            if (result) fixtures = result;
+          }
         }
-
-        console.log(`Fetching ${league.name} with params:`, JSON.stringify(params));
-        const fixtures = await fetchFromAPIFootball("fixtures", params);
-        console.log(`${league.name}: ${fixtures?.length || 0} fixtures found`);
-
-        if (!fixtures || fixtures.length === 0) continue;
+        
+        console.log(`${league.name}: ${fixtures.length} fixtures found`);
+        if (fixtures.length === 0) continue;
 
         for (const fix of fixtures) {
           const fixtureId = fix.fixture.id;
