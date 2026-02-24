@@ -14,7 +14,202 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      lineups: {
+        Row: {
+          created_at: string
+          formation: string | null
+          id: string
+          is_home: boolean
+          match_id: string | null
+          players: Json | null
+          team_name: string
+        }
+        Insert: {
+          created_at?: string
+          formation?: string | null
+          id?: string
+          is_home?: boolean
+          match_id?: string | null
+          players?: Json | null
+          team_name: string
+        }
+        Update: {
+          created_at?: string
+          formation?: string | null
+          id?: string
+          is_home?: boolean
+          match_id?: string | null
+          players?: Json | null
+          team_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lineups_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      matches: {
+        Row: {
+          api_id: number | null
+          away_elo: number | null
+          away_lambda: number | null
+          away_logo: string | null
+          away_odds: number | null
+          away_ppda: number | null
+          away_score: number | null
+          away_team: string
+          away_team_id: number | null
+          away_win_prob: number | null
+          away_xg: number | null
+          created_at: string
+          draw_odds: number | null
+          draw_prob: number | null
+          home_elo: number | null
+          home_lambda: number | null
+          home_logo: string | null
+          home_odds: number | null
+          home_ppda: number | null
+          home_score: number | null
+          home_team: string
+          home_team_id: number | null
+          home_win_prob: number | null
+          home_xg: number | null
+          id: string
+          kickoff: string | null
+          league: string
+          league_id: number | null
+          round: string | null
+          season: number | null
+          status: string | null
+          updated_at: string
+          venue: string | null
+        }
+        Insert: {
+          api_id?: number | null
+          away_elo?: number | null
+          away_lambda?: number | null
+          away_logo?: string | null
+          away_odds?: number | null
+          away_ppda?: number | null
+          away_score?: number | null
+          away_team: string
+          away_team_id?: number | null
+          away_win_prob?: number | null
+          away_xg?: number | null
+          created_at?: string
+          draw_odds?: number | null
+          draw_prob?: number | null
+          home_elo?: number | null
+          home_lambda?: number | null
+          home_logo?: string | null
+          home_odds?: number | null
+          home_ppda?: number | null
+          home_score?: number | null
+          home_team: string
+          home_team_id?: number | null
+          home_win_prob?: number | null
+          home_xg?: number | null
+          id?: string
+          kickoff?: string | null
+          league: string
+          league_id?: number | null
+          round?: string | null
+          season?: number | null
+          status?: string | null
+          updated_at?: string
+          venue?: string | null
+        }
+        Update: {
+          api_id?: number | null
+          away_elo?: number | null
+          away_lambda?: number | null
+          away_logo?: string | null
+          away_odds?: number | null
+          away_ppda?: number | null
+          away_score?: number | null
+          away_team?: string
+          away_team_id?: number | null
+          away_win_prob?: number | null
+          away_xg?: number | null
+          created_at?: string
+          draw_odds?: number | null
+          draw_prob?: number | null
+          home_elo?: number | null
+          home_lambda?: number | null
+          home_logo?: string | null
+          home_odds?: number | null
+          home_ppda?: number | null
+          home_score?: number | null
+          home_team?: string
+          home_team_id?: number | null
+          home_win_prob?: number | null
+          home_xg?: number | null
+          id?: string
+          kickoff?: string | null
+          league?: string
+          league_id?: number | null
+          round?: string | null
+          season?: number | null
+          status?: string | null
+          updated_at?: string
+          venue?: string | null
+        }
+        Relationships: []
+      }
+      odds_history: {
+        Row: {
+          away_odds: number | null
+          bookmaker: string | null
+          btts_no_odds: number | null
+          btts_yes_odds: number | null
+          draw_odds: number | null
+          home_odds: number | null
+          id: string
+          match_id: string | null
+          over25_odds: number | null
+          recorded_at: string
+          under25_odds: number | null
+        }
+        Insert: {
+          away_odds?: number | null
+          bookmaker?: string | null
+          btts_no_odds?: number | null
+          btts_yes_odds?: number | null
+          draw_odds?: number | null
+          home_odds?: number | null
+          id?: string
+          match_id?: string | null
+          over25_odds?: number | null
+          recorded_at?: string
+          under25_odds?: number | null
+        }
+        Update: {
+          away_odds?: number | null
+          bookmaker?: string | null
+          btts_no_odds?: number | null
+          btts_yes_odds?: number | null
+          draw_odds?: number | null
+          home_odds?: number | null
+          id?: string
+          match_id?: string | null
+          over25_odds?: number | null
+          recorded_at?: string
+          under25_odds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "odds_history_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
