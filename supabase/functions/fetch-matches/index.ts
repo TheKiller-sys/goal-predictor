@@ -31,6 +31,10 @@ async function fetchFromAPIFootball(endpoint: string, params: Record<string, str
 
   if (!res.ok) throw new Error(`API-Football error: ${res.status}`);
   const data = await res.json();
+  console.log(`API response for ${endpoint}:`, JSON.stringify(data).substring(0, 500));
+  if (data.errors && Object.keys(data.errors).length > 0) {
+    console.error("API errors:", JSON.stringify(data.errors));
+  }
   return data.response;
 }
 
