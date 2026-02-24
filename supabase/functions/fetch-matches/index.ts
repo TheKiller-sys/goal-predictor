@@ -16,7 +16,7 @@ const LEAGUES = [
   { id: 2, name: "Champions League" },
 ];
 
-const CURRENT_SEASON = 2024;
+const CURRENT_SEASON = 2025;
 
 async function fetchFromAPIFootball(endpoint: string, params: Record<string, string>) {
   const apiKey = Deno.env.get("API_FOOTBALL_KEY");
