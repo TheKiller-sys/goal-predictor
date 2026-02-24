@@ -1,1 +1,4 @@
 project_id = "neorruwtewftfntaezba"
+
+[functions.fetch-matches]
+verify_jwt = false
