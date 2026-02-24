@@ -5,6 +5,7 @@ import { ArrowLeft, Zap, Target, Shield, Star } from "lucide-react";
 import { mockMatches } from "@/lib/mockData";
 import { runMonteCarlo } from "@/lib/monteCarlo";
 import { mockLineups } from "@/lib/mockLineups";
+import { useMatch, dbMatchToMatch } from "@/hooks/useMatches";
 import PoissonMatrix from "@/components/PoissonMatrix";
 import GoalDistributionChart from "@/components/GoalDistributionChart";
 import ScoreHeatmap from "@/components/ScoreHeatmap";
@@ -15,12 +16,27 @@ import {
 
 const MatchDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const match = mockMatches.find((m) => m.id === id);
+
+  // Try DB first, fall back to mock
+  const { data: dbMatch, isLoading } = useMatch(id || "");
+  
+  const match = useMemo(() => {
+    if (dbMatch) return dbMatchToMatch(dbMatch);
+    return mockMatches.find((m) => m.id === id) || null;
+  }, [dbMatch, id]);
 
   const mcResult = useMemo(
     () => (match ? runMonteCarlo(match, 10000) : null),
     [match]
   );
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-muted-foreground">Cargando partido...</div>
+      </div>
+    );
+  }
 
   if (!match || !mcResult) {
     return (
