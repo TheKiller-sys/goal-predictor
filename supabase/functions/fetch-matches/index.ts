@@ -90,14 +90,27 @@ Deno.serve(async (req) => {
 
     for (const league of leaguesToFetch) {
       try {
-        // Fetch upcoming/recent fixtures
-        const params: Record<string, string> = {
-          league: league.id.toString(),
-          season: CURRENT_SEASON.toString(),
-        };
-        if (action === "upcoming") params.next = "10";
-        else if (action === "live") params.live = "all";
-        else params.last = "10";
+        // Fetch fixtures - "next" doesn't work with "season" param
+        let params: Record<string, string>;
+        if (action === "live") {
+          params = { live: "all" };
+        } else if (action === "upcoming") {
+          // Get next 10 from this league
+          const today = new Date().toISOString().split("T")[0];
+          const future = new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0];
+          params = {
+            league: league.id.toString(),
+            season: CURRENT_SEASON.toString(),
+            from: today,
+            to: future,
+          };
+        } else {
+          params = {
+            league: league.id.toString(),
+            season: CURRENT_SEASON.toString(),
+            last: "10",
+          };
+        }
 
         console.log(`Fetching ${league.name} with params:`, JSON.stringify(params));
         const fixtures = await fetchFromAPIFootball("fixtures", params);
