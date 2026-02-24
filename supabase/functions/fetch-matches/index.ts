@@ -91,15 +91,17 @@ Deno.serve(async (req) => {
     for (const league of leaguesToFetch) {
       try {
         // Fetch upcoming/recent fixtures
-        const fixtures = await fetchFromAPIFootball("fixtures", {
+        const params: Record<string, string> = {
           league: league.id.toString(),
           season: CURRENT_SEASON.toString(),
-          ...(action === "upcoming"
-            ? { next: "10" }
-            : action === "live"
-            ? { live: "all" }
-            : { last: "10" }),
-        });
+        };
+        if (action === "upcoming") params.next = "10";
+        else if (action === "live") params.live = "all";
+        else params.last = "10";
+
+        console.log(`Fetching ${league.name} with params:`, JSON.stringify(params));
+        const fixtures = await fetchFromAPIFootball("fixtures", params);
+        console.log(`${league.name}: ${fixtures?.length || 0} fixtures found`);
 
         if (!fixtures || fixtures.length === 0) continue;
 
