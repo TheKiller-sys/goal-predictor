@@ -8,7 +8,7 @@ import ValueBetsTable from "@/components/ValueBetsTable";
 import BankrollChart from "@/components/BankrollChart";
 import { mockMatches, mockValueBets, mockBankroll } from "@/lib/mockData";
 import type { Match } from "@/lib/mockData";
-import { Target, TrendingUp, Percent, DollarSign, RefreshCw } from "lucide-react";
+import { Target, TrendingUp, Percent, DollarSign, RefreshCw, Database, BarChart3 } from "lucide-react";
 import { useMatches, dbMatchToMatch } from "@/hooks/useMatches";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -32,25 +32,37 @@ const Index = () => {
     }
   }, [matches, selectedMatch]);
 
-  const handleSync = async () => {
+  const handleSync = async (source: "fetch-matches" | "fetch-football-data" | "enrich-xg") => {
     setSyncing(true);
+    const labels: Record<string, string> = {
+      "fetch-matches": "API-Football (2024)",
+      "fetch-football-data": "Football-data.org (actual)",
+      "enrich-xg": "FBref xG/PPDA",
+    };
     try {
-      const { data, error } = await supabase.functions.invoke("fetch-matches");
+      const { data, error } = await supabase.functions.invoke(source);
       if (error) throw error;
+      const count = data?.matchesProcessed || data?.matchesEnriched || 0;
       toast({
-        title: "Datos sincronizados",
-        description: `${data?.matchesProcessed || 0} partidos procesados desde API-Football`,
+        title: `${labels[source]} sincronizado`,
+        description: `${count} partidos procesados`,
       });
       refetch();
     } catch (err: any) {
       toast({
-        title: "Error al sincronizar",
+        title: `Error: ${labels[source]}`,
         description: err.message,
         variant: "destructive",
       });
     } finally {
       setSyncing(false);
     }
+  };
+
+  const handleSyncAll = async () => {
+    await handleSync("fetch-football-data");
+    await handleSync("fetch-matches");
+    await handleSync("enrich-xg");
   };
 
   if (!selectedMatch) return null;
@@ -78,14 +90,35 @@ const Index = () => {
           <div className="lg:col-span-1 space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Partidos Analizados</h2>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <span className="font-mono text-[10px] text-muted-foreground">{matches.length} partidos</span>
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6"
-                  onClick={handleSync}
+                  onClick={() => handleSync("fetch-football-data")}
                   disabled={syncing}
+                  title="Football-data.org (temporada actual)"
+                >
+                  <Database className={`h-3 w-3 ${syncing ? "animate-spin" : ""}`} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => handleSync("enrich-xg")}
+                  disabled={syncing}
+                  title="Enriquecer xG/PPDA (FBref)"
+                >
+                  <BarChart3 className={`h-3 w-3 ${syncing ? "animate-spin" : ""}`} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={handleSyncAll}
+                  disabled={syncing}
+                  title="Sincronizar todo"
                 >
                   <RefreshCw className={`h-3 w-3 ${syncing ? "animate-spin" : ""}`} />
                 </Button>

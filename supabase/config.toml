@@ -2,3 +2,9 @@ project_id = "neorruwtewftfntaezba"
 
 [functions.fetch-matches]
 verify_jwt = false
+
+[functions.fetch-football-data]
+verify_jwt = false
+
+[functions.enrich-xg]
+verify_jwt = false
