@@ -20,6 +20,9 @@ export function useMatches() {
 }
 
 export function useMatch(id: string) {
+  // Only query DB if id looks like a UUID
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  
   return useQuery({
     queryKey: ["match", id],
     queryFn: async () => {
@@ -32,6 +35,7 @@ export function useMatch(id: string) {
       if (error) throw error;
       return data as DBMatch | null;
     },
+    enabled: isUUID && !!id,
   });
 }
 

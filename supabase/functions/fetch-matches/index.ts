@@ -7,35 +7,64 @@ const corsHeaders = {
 };
 
 // Top 5 leagues
+// Limit to 3 leagues to stay within free plan rate limits
 const LEAGUES = [
   { id: 39, name: "Premier League" },
   { id: 140, name: "La Liga" },
   { id: 135, name: "Serie A" },
-  { id: 78, name: "Bundesliga" },
-  { id: 61, name: "Ligue 1" },
-  { id: 2, name: "Champions League" },
 ];
 
-const CURRENT_SEASON = 2025;
+// Free plan: seasons 2022-2024 only, no "next" param
+const CURRENT_SEASON = 2024;
 
 async function fetchFromAPIFootball(endpoint: string, params: Record<string, string>) {
   const apiKey = Deno.env.get("API_FOOTBALL_KEY");
   if (!apiKey) throw new Error("API_FOOTBALL_KEY not set");
 
-  const url = new URL(`https://v3.football.api-sports.io/${endpoint}`);
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  // Try RapidAPI first, then api-sports.io
+  const attempts = [
+    {
+      url: `https://api-football-v1.p.rapidapi.com/v3/${endpoint}`,
+      headers: {
+        "x-rapidapi-key": apiKey,
+        "x-rapidapi-host": "api-football-v1.p.rapidapi.com",
+      },
+    },
+    {
+      url: `https://v3.football.api-sports.io/${endpoint}`,
+      headers: { "x-apisports-key": apiKey },
+    },
+  ];
 
-  const res = await fetch(url.toString(), {
-    headers: { "x-apisports-key": apiKey },
-  });
+  for (const attempt of attempts) {
+    try {
+      const url = new URL(attempt.url);
+      Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
-  if (!res.ok) throw new Error(`API-Football error: ${res.status}`);
-  const data = await res.json();
-  console.log(`API response for ${endpoint}:`, JSON.stringify(data).substring(0, 500));
-  if (data.errors && Object.keys(data.errors).length > 0) {
-    console.error("API errors:", JSON.stringify(data.errors));
+      const res = await fetch(url.toString(), { headers: attempt.headers });
+      if (!res.ok) continue;
+      
+      const data = await res.json();
+      console.log(`API response (${attempt.url.split('/')[2]}):`, JSON.stringify(data).substring(0, 300));
+      
+      if (data.errors && Object.keys(data.errors).length > 0) {
+        const errorStr = JSON.stringify(data.errors);
+        if (errorStr.includes("token") || errorStr.includes("key")) {
+          console.log("Auth error, trying next endpoint...");
+          continue;
+        }
+        console.error("API errors:", errorStr);
+      }
+      
+      if (data.response && data.response.length > 0) return data.response;
+      return data.response || [];
+    } catch (e) {
+      console.log(`Attempt failed for ${attempt.url.split('/')[2]}:`, e.message);
+      continue;
+    }
   }
-  return data.response;
+  
+  return [];
 }
 
 function computePoisson(avgGoals: number): number[] {
@@ -94,49 +123,30 @@ Deno.serve(async (req) => {
 
     for (const league of leaguesToFetch) {
       try {
-        let fixtures: any[] = [];
+        // Free plan: only seasons 2022-2024, no "next" param, no future dates
+        // Fetch last round of the latest available season
+        const params: Record<string, string> = {
+          league: league.id.toString(),
+          season: CURRENT_SEASON.toString(),
+        };
         
-        if (action === "live") {
-          fixtures = await fetchFromAPIFootball("fixtures", { live: "all" }) || [];
-        } else {
-          // Try current season first, then previous
-          for (const season of [CURRENT_SEASON, CURRENT_SEASON - 1]) {
-            const params: Record<string, string> = {
-              league: league.id.toString(),
-              season: season.toString(),
-            };
-            if (action === "upcoming") {
-              const today = new Date().toISOString().split("T")[0];
-              const future = new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
-              params.from = today;
-              params.to = future;
-            } else {
-              params.last = "10";
-            }
-            
-            console.log(`Fetching ${league.name} season ${season}:`, JSON.stringify(params));
-            const result = await fetchFromAPIFootball("fixtures", params);
-            if (result && result.length > 0) {
-              fixtures = result;
-              break;
-            }
-          }
-          
-          // Fallback: try without season using next
-          if (fixtures.length === 0) {
-            console.log(`Fallback: ${league.name} using next param`);
-            const result = await fetchFromAPIFootball("fixtures", {
-              league: league.id.toString(),
-              next: "5",
-            });
-            if (result) fixtures = result;
-          }
+        // For free plan, fetch a specific round or the last matches
+        if (action === "last") {
+          params.last = "10";
         }
+        // Don't use from/to with future dates - just get all fixtures
         
-        console.log(`${league.name}: ${fixtures.length} fixtures found`);
-        if (fixtures.length === 0) continue;
+        console.log(`Fetching ${league.name}:`, JSON.stringify(params));
+        const fixtures = await fetchFromAPIFootball("fixtures", params);
+        console.log(`${league.name}: ${fixtures?.length || 0} fixtures found`);
+        
+        if (!fixtures || fixtures.length === 0) continue;
 
-        for (const fix of fixtures) {
+        // Take only last 20 fixtures (most recent) to avoid timeout
+        const recentFixtures = fixtures.slice(-20);
+        console.log(`Processing ${recentFixtures.length} recent fixtures for ${league.name}`);
+
+        for (const fix of recentFixtures) {
           const fixtureId = fix.fixture.id;
           const homeTeam = fix.teams.home.name;
           const awayTeam = fix.teams.away.name;
@@ -189,89 +199,7 @@ Deno.serve(async (req) => {
           if (!error) totalInserted++;
         }
 
-        // Fetch odds for this league's fixtures
-        try {
-          const odds = await fetchFromAPIFootball("odds", {
-            league: league.id.toString(),
-            season: CURRENT_SEASON.toString(),
-          });
-
-          if (odds && odds.length > 0) {
-            for (const oddFixture of odds.slice(0, 10)) {
-              const fixtureApiId = oddFixture.fixture.id;
-
-              // Get match from DB
-              const { data: matchRow } = await supabase
-                .from("matches")
-                .select("id")
-                .eq("api_id", fixtureApiId)
-                .maybeSingle();
-
-              if (!matchRow) continue;
-
-              for (const bookmaker of oddFixture.bookmakers?.slice(0, 3) || []) {
-                const matchWinner = bookmaker.bets?.find(
-                  (b: any) => b.name === "Match Winner"
-                );
-                const overUnder = bookmaker.bets?.find(
-                  (b: any) => b.name === "Goals Over/Under"
-                );
-                const btts = bookmaker.bets?.find(
-                  (b: any) => b.name === "Both Teams Score"
-                );
-
-                const homeOdd = matchWinner?.values?.find(
-                  (v: any) => v.value === "Home"
-                )?.odd;
-                const drawOdd = matchWinner?.values?.find(
-                  (v: any) => v.value === "Draw"
-                )?.odd;
-                const awayOdd = matchWinner?.values?.find(
-                  (v: any) => v.value === "Away"
-                )?.odd;
-                const over25 = overUnder?.values?.find(
-                  (v: any) => v.value === "Over 2.5"
-                )?.odd;
-                const under25 = overUnder?.values?.find(
-                  (v: any) => v.value === "Under 2.5"
-                )?.odd;
-                const bttsYes = btts?.values?.find(
-                  (v: any) => v.value === "Yes"
-                )?.odd;
-                const bttsNo = btts?.values?.find(
-                  (v: any) => v.value === "No"
-                )?.odd;
-
-                if (homeOdd) {
-                  // Update match odds
-                  await supabase
-                    .from("matches")
-                    .update({
-                      home_odds: parseFloat(homeOdd),
-                      draw_odds: drawOdd ? parseFloat(drawOdd) : null,
-                      away_odds: awayOdd ? parseFloat(awayOdd) : null,
-                    })
-                    .eq("id", matchRow.id);
-
-                  // Record odds history
-                  await supabase.from("odds_history").insert({
-                    match_id: matchRow.id,
-                    bookmaker: bookmaker.name,
-                    home_odds: homeOdd ? parseFloat(homeOdd) : null,
-                    draw_odds: drawOdd ? parseFloat(drawOdd) : null,
-                    away_odds: awayOdd ? parseFloat(awayOdd) : null,
-                    over25_odds: over25 ? parseFloat(over25) : null,
-                    under25_odds: under25 ? parseFloat(under25) : null,
-                    btts_yes_odds: bttsYes ? parseFloat(bttsYes) : null,
-                    btts_no_odds: bttsNo ? parseFloat(bttsNo) : null,
-                  });
-                }
-              }
-            }
-          }
-        } catch (oddsErr) {
-          console.log(`Odds fetch skipped for ${league.name}:`, oddsErr);
-        }
+        // Skip odds fetching for now to avoid rate limits on free plan
       } catch (leagueErr) {
         console.error(`Error fetching ${league.name}:`, leagueErr);
       }
